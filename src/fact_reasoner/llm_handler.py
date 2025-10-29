@@ -60,7 +60,7 @@ class LLMHandler:
 
         self.backend = backend  # The model's backend: one of [rits, hf, wx]
         self.default_kwargs = default_kwargs  # Store common parameters for completions
-        assert backend in ["rits", "hf", "wx"], \
+        assert backend in ["rits", "hf", "wx", "bedrock"], \
             f"Model backend {backend} is not supported yet. Use `rits`, `hf` or `wx` only."
         
         self.models_config = get_models_config()
@@ -87,6 +87,10 @@ class LLMHandler:
             elif self.backend == "wx":
                 self.api_key = os.getenv("WX_API_KEY")
                 self.model_info = self.models_config["WX_MODELS"][model_id]
+            elif self.backend == "bedrock":
+                self.model_info = self.models_config["BEDROCK_MODELS"][model_id]
+                self.api_key = None
+                
             else:
                 raise ValueError(f"Uknown backend value: {self.backend}")
             
