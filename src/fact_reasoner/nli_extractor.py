@@ -339,6 +339,8 @@ class NLIExtractor:
                     seed=12345,
                 )
 
+                print("GENERATED RESPONSE: ", responses)
+
                 for response in responses:
                     generated_texts.append(response.choices[0].message.content)
                     generated_logprobs.append(response.choices[0].logprobs['content'])
