@@ -97,7 +97,7 @@ WX_MODELS:
     prompt_begin: "<|begin_of_text|><|start_header_id|>user<|end_header_id|>"
     prompt_end: "<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
 BEDROCK_MODELS: 
-  llama-3.3-70b-instruct:
+  custom-llama-3.3-70b-instruct:
     model_id: "bedrock/llama/arn:aws:bedrock:us-east-1:491065739995:imported-model/88wikk5m9jx8"
     api_base: ""
     max_new_tokens: 128000
