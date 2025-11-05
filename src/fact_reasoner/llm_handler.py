@@ -27,13 +27,14 @@ from src.fact_reasoner.utils import (
     get_models_config,
 )
 
+os.environ["LITELLM_LOG"] = "DEBUG"
+
 GPU = torch.cuda.is_available()
 DEVICE = GPU * "cuda" + (not GPU) * "cpu"
 
 # Avoid sending unsupported params to LiteLLM (since different backends have
 # different supported params)
 litellm.drop_params = True
-litellm.set_verbose = True
 
 
 class dotdict(dict):
@@ -229,6 +230,7 @@ class LLMHandler:
         elif self.backend == "bedrock":
             params["logprobs"] = True
             params["top_logprobs"] = 5
+            params["return_logprobs"] = True
             if isinstance(prompts, str):
                 return litellm.completion(
                     model=self.model_id,
