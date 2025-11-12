@@ -27,6 +27,8 @@ from src.fact_reasoner.utils import (
     get_models_config,
 )
 
+from src.fact_reasoner.bedrock import BedrockLlamaWithLogprobsClient
+
 os.environ["LITELLM_LOG"] = "DEBUG"
 
 GPU = torch.cuda.is_available()
@@ -228,26 +230,35 @@ class LLMHandler:
                 **params,
             )
         elif self.backend == "bedrock":
-            params["logprobs"] = True
-            params["top_logprobs"] = 5
-            params["return_logprobs"] = True
-            if isinstance(prompts, str):
-                return litellm.completion(
-                    model=self.model_id,
-                    messages=[
-                        {"role": "user", "content": prompts}
-                    ],  # Wrap prompt for compatibility
-                    num_retries=num_retries,
-                    **params,
-                )
-            return litellm.batch_completion(
-                model=self.model_id,
-                messages=[
-                    [{"role": "user", "content": p}] for p in prompts
-                ],  # Wrap each prompt
-                num_retries=num_retries,
-                **params,
-            )
+
+            bedrock_client = BedrockLlamaWithLogprobsClient(model_arn=self.model_id)
+            return bedrock_client.completion(prompts, **params)
+
+            # params["logprobs"] = True
+            # params["top_logprobs"] = 5
+            # params["return_logprobs"] = True
+
+            # # Bedrock cycles the models off of the compute infrastructure,
+            # # after a period of innactivty so we increase the retry count
+            # # to account for the time needed to spin up the model again.
+            # num_retries = 10
+            # if isinstance(prompts, str):
+            #     return litellm.completion(
+            #         model=self.model_id,
+            #         messages=[
+            #             {"role": "user", "content": prompts}
+            #         ],  # Wrap prompt for compatibility
+            #         num_retries=num_retries,
+            #         **params,
+            #     )
+            # return litellm.batch_completion(
+            #     model=self.model_id,
+            #     messages=[
+            #         [{"role": "user", "content": p}] for p in prompts
+            #     ],  # Wrap each prompt
+            #     num_retries=num_retries,
+            #     **params,
+            # )
 
         elif self.backend == "hf":
             # Ensure prompts is always a list for vLLM

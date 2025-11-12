@@ -25,13 +25,17 @@ from tqdm import tqdm
 #     sys.path.insert(0, package_source_path)
 
 # Local imports
-from src.fact_reasoner.prompts import ATOM_EXTRACTION_PROMPT_V1, ATOM_EXTRACTION_PROMPT_V2
+from src.fact_reasoner.prompts import (
+    ATOM_EXTRACTION_PROMPT_V1,
+    ATOM_EXTRACTION_PROMPT_V2,
+)
 from src.fact_reasoner.llm_handler import LLMHandler
 
-_ATOM = 'atom'
-_LABEL = 'label'
+_ATOM = "atom"
+_LABEL = "label"
 
-def text_to_units(text: str, separator: str = '- ') -> List[str]:
+
+def text_to_units(text: str, separator: str = "- ") -> List[str]:
     """
     Parse the input text into atomic units and their labels.
 
@@ -51,17 +55,18 @@ def text_to_units(text: str, separator: str = '- ') -> List[str]:
     preamble = True
     for line in text.strip().splitlines():
         line = line.strip()
-        
+
         if line.startswith(separator):
-            if preamble: preamble = False
+            if preamble:
+                preamble = False
             if current_unit:
                 # Process the previous unit if it's completed
                 full_unit = "\n".join(current_unit).strip()
-                if ": " in full_unit: # the format is - atomic unit: atomic unit type
+                if ": " in full_unit:  # the format is - atomic unit: atomic unit type
                     unit, label = full_unit.rsplit(": ", 1)
                     parsed_units.append(unit.strip())
                     parsed_labels.append(label.strip())
-                else: # the format is just - atomic unit
+                else:  # the format is just - atomic unit
                     unit, label = full_unit.strip(), "Fact"
                     parsed_units.append(unit.strip())
                     parsed_labels.append(label.strip())
@@ -70,10 +75,10 @@ def text_to_units(text: str, separator: str = '- ') -> List[str]:
             current_unit.append(line[2:].strip())
         else:
             if preamble:
-                continue # skip preamble lines that do not start with '-'
+                continue  # skip preamble lines that do not start with '-'
             # Continue adding lines to the current unit
             current_unit.append(line.strip())
-    
+
     # Process the last unit
     if current_unit:
         full_unit = "\n".join(current_unit).strip()
@@ -85,13 +90,16 @@ def text_to_units(text: str, separator: str = '- ') -> List[str]:
             unit, label = full_unit.strip(), "Fact"
             parsed_units.append(unit.strip())
             parsed_labels.append(label.strip())
-    
+
     return parsed_units, parsed_labels
 
-def convert_atomic_units_to_dicts_(labels: List[str], units: List[str]) -> List[dict[str, Any]]:
+
+def convert_atomic_units_to_dicts_(
+    labels: List[str], units: List[str]
+) -> List[dict[str, Any]]:
     """
     Convert atomic units and their labels into a list of dictionaries.
-    
+
     Args:
         labels: List[str]
             A list of labels for the atomic units.
@@ -102,22 +110,20 @@ def convert_atomic_units_to_dicts_(labels: List[str], units: List[str]) -> List[
         List[dict[str, Any]]: A list of dictionaries where each dictionary contains
         a label and its corresponding atomic unit.
     """
-    return [
-        {_LABEL: label, _ATOM: atom}
-        for label, atom in zip(labels, units)
-    ]
- 
+    return [{_LABEL: label, _ATOM: atom} for label, atom in zip(labels, units)]
+
+
 class AtomExtractor(object):
     """
-    Main class for atomic unit decomposition (i.e., atom extraction). 
+    Main class for atomic unit decomposition (i.e., atom extraction).
     An atomic unit is either a fact or a claim.
     """
 
     def __init__(
-        self, 
+        self,
         model_id: str = "llama-3.1-70b-instruct",
         prompt_version: str = "v1",
-        backend: str = "rits"
+        backend: str = "rits",
     ):
         """
         Initialize the AtomExtractor.
@@ -129,8 +135,8 @@ class AtomExtractor(object):
                 The prompt version used for the model (v1 - original, v2 - newer)
             backend: str
                 The model's backend (rits, hf or wx).
-        """ 
-        
+        """
+
         # Initialize the extractor
         self.model_id = model_id
         self.backend = backend
@@ -140,18 +146,18 @@ class AtomExtractor(object):
         # Set the prompt begin and end templates
         self.prompt_begin = self.llm_handler.get_prompt_begin()
         self.prompt_end = self.llm_handler.get_prompt_end()
-        
+
         print(f"[AtomExtractor] Using LLM on {self.backend}: {self.model_id}")
         print(f"[AtomExtractor] Using prompt version: {self.prompt_version}")
 
     def make_prompt(self, response: str) -> str:
         """
         Create the prompt for atom extraction based on the response.
-        
+
         Args:
             response: str
                 The response from which to extract atomic units.
-        
+
         Returns:
             str: The formatted prompt for the LLM.
         """
@@ -160,18 +166,20 @@ class AtomExtractor(object):
             prompt = ATOM_EXTRACTION_PROMPT_V1.format(
                 _RESPONSE_PLACEHOLDER=response,
                 _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
-                _PROMPT_END_PLACEHOLDER=self.prompt_end
+                _PROMPT_END_PLACEHOLDER=self.prompt_end,
             )
         elif self.prompt_version == "v2":
             prompt = ATOM_EXTRACTION_PROMPT_V2.format(
                 _RESPONSE_PLACEHOLDER=response,
                 _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
-                _PROMPT_END_PLACEHOLDER=self.prompt_end
+                _PROMPT_END_PLACEHOLDER=self.prompt_end,
             )
         else:
-            raise ValueError(f"Unknown prompt version: {self.prompt_version}. "
-                    f"Supported versions are: 'v1', 'v2'.")
-        
+            raise ValueError(
+                f"Unknown prompt version: {self.prompt_version}. "
+                f"Supported versions are: 'v1', 'v2'."
+            )
+
         return prompt
 
     def get_atoms_from_response(self, response: str):
@@ -187,6 +195,7 @@ class AtomExtractor(object):
         """
 
         print(f"[AtomExtractor] Prompts created: 1")
+
         prompt = self.make_prompt(response)
         response = self.llm_handler.completion(prompt)
         output = response.choices[0].message.content
@@ -200,7 +209,7 @@ class AtomExtractor(object):
         Args:
             responses: List[str]
                 A list of responses from which to extract atomic units.
-        
+
         Returns:
             List[List[str]]: A list of lists, where each inner list contains atomic units (facts or claims).
             List[List[str]]: A list of lists, where each inner list contains labels corresponding to the atomic units.
@@ -211,14 +220,12 @@ class AtomExtractor(object):
         print(f"[AtomExtractor] Prompts created: {len(prompts)}")
 
         for _, response in tqdm(
-            enumerate(
-                self.llm_handler.batch_completion(prompts)
-            ),
+            enumerate(self.llm_handler.batch_completion(prompts)),
             total=len(prompts),
             desc="Extractor",
             unit="prompts",
-            ):
-                results.append(response.choices[0].message.content)
+        ):
+            results.append(response.choices[0].message.content)
 
         all_units = []
         all_labels = []
@@ -226,11 +233,11 @@ class AtomExtractor(object):
             units, labels = text_to_units(result)
             all_units.append(units)
             all_labels.append(labels)
-        
+
         return all_units, all_labels
 
     def run(self, response: str) -> dict[str, Any]:
-        """ Extract atomic units from a single response.
+        """Extract atomic units from a single response.
         Args:
             response: str
                 The response from which to extract atomic units.
@@ -240,41 +247,52 @@ class AtomExtractor(object):
         """
 
         units, labels = self.get_atoms_from_response(response)
+
         # print(f"units: {units}, labels: {labels}")
         units_as_dict = convert_atomic_units_to_dicts_(labels, units)
-        facts_as_dict = [unit for unit in units_as_dict if unit[_LABEL].lower() in ["fact", "claim"]]
-        
+        facts_as_dict = [
+            unit for unit in units_as_dict if unit[_LABEL].lower() in ["fact", "claim"]
+        ]
+
         return {
-            'num_atoms': len(units),
-            'atoms': units,
-            'all_atoms': units_as_dict,
-            'all_facts': facts_as_dict
+            "num_atoms": len(units),
+            "atoms": units,
+            "all_atoms": units_as_dict,
+            "all_facts": facts_as_dict,
         }
-    
+
     def runall(self, responses: List[str]) -> List[dict[str, Any]]:
-        """ Extract atomic units from multiple responses.
+        """Extract atomic units from multiple responses.
         Args:
             responses: List[str]
                 A list of responses from which to extract atomic units.
 
         Returns:
             List[dict]: A list of dictionaries, where each dictionary contains the number of atomic units,
-            the units themselves, all atomic units as dictionaries, and all facts as dictionaries."""
+            the units themselves, all atomic units as dictionaries, and all facts as dictionaries.
+        """
 
         results = []
         units, labels = self.get_atoms_from_responses(responses)
         # print(f"units: {units}, labels: {labels}")
         for i in range(len(responses)):
             units_as_dict = convert_atomic_units_to_dicts_(labels[i], units[i])
-            facts_as_dict = [unit for unit in units_as_dict if unit[_LABEL].lower() in ["fact", "claim"]]
-            results.append({
-                'num_atoms': len(units[i]),
-                'atoms': units[i],
-                'all_atoms': units_as_dict,
-                'all_facts': facts_as_dict
-            })
+            facts_as_dict = [
+                unit
+                for unit in units_as_dict
+                if unit[_LABEL].lower() in ["fact", "claim"]
+            ]
+            results.append(
+                {
+                    "num_atoms": len(units[i]),
+                    "atoms": units[i],
+                    "all_atoms": units_as_dict,
+                    "all_facts": facts_as_dict,
+                }
+            )
 
         return results
+
 
 if __name__ == "__main__":
 
@@ -282,7 +300,9 @@ if __name__ == "__main__":
     prompt_version = "v2"
     backend = "rits"
 
-    extractor = AtomExtractor(model_id=model_id, prompt_version=prompt_version, backend=backend)
+    extractor = AtomExtractor(
+        model_id=model_id, prompt_version=prompt_version, backend=backend
+    )
 
     response = "The Apollo 14 mission to the Moon took place on January 31, 1971. \
         This mission was significant as it marked the third time humans set \
@@ -293,7 +313,7 @@ if __name__ == "__main__":
         lunar surface. Apollo 14 brought back approximately 70 kilograms of \
         lunar material, including rocks, soil, and core samples, which have \
         been invaluable for scientific research ever since."
-      
+
     result = extractor.run(response)
     num_atoms = result["num_atoms"]
     print(f"Number of atoms: {num_atoms}")
@@ -317,17 +337,16 @@ if __name__ == "__main__":
         numerous awards and honors for his inventions, including the Thomas A. \
         Edison Foundation Gold Medal in 1987. He passed away on February 23, 1995, \
         leaving behind a legacy of innovation and entrepreneurship.",
-        
-        "Lanny Flaherty is an American actor born on December 18, 1949, in \
+        'Lanny Flaherty is an American actor born on December 18, 1949, in \
         Pensacola, Florida. He has appeared in numerous films, television shows, \
         and theater productions throughout his career, which began in the late 1970s. \
-        Some of his notable film credits include \"King of New York,\" \"The Abyss,\" \
-        \"Natural Born Killers,\" \"The Game,\" and \"The Straight Story.\" On television, \
-        he has appeared in shows such as \"Law & Order,\" \"The Sopranos,\" \"Boardwalk Empire,\" \
-        and \"The Leftovers.\" Flaherty has also worked extensively in theater, \
+        Some of his notable film credits include "King of New York," "The Abyss," \
+        "Natural Born Killers," "The Game," and "The Straight Story." On television, \
+        he has appeared in shows such as "Law & Order," "The Sopranos," "Boardwalk Empire," \
+        and "The Leftovers." Flaherty has also worked extensively in theater, \
         including productions at the Public Theater and the New York Shakespeare \
         Festival. He is known for his distinctive looks and deep gravelly voice, \
-        which have made him a memorable character actor in the industry."
+        which have made him a memorable character actor in the industry.',
     ]
 
     results = extractor.runall(responses)

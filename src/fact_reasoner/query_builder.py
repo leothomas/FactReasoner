@@ -23,13 +23,16 @@ from src.fact_reasoner.utils import extract_last_square_brackets
 from src.fact_reasoner.llm_handler import LLMHandler
 from src.fact_reasoner.prompts import QUERY_BUILDER_PROMPT_V1, QUERY_BUILDER_PROMPT_V2
 
+
 class QueryBuilder:
     """
     The QueryBuilder uses an LLM to generate a query string. The query is then
     used to retrieve results from Google Search, Wikipedia, ChromaDB.
     """
 
-    def __init__(self, model_id: str, prompt_version: str = "v1", backend: str = "rits"):
+    def __init__(
+        self, model_id: str, prompt_version: str = "v1", backend: str = "rits"
+    ):
         """
         Initialize the QueryBuilder.
 
@@ -52,7 +55,7 @@ class QueryBuilder:
 
         print(f"[QueryBuilder] Using LLM on {self.backend}: {self.model_id}")
         print(f"[QueryBuilder] Using prompt version: {self.prompt_version}")
-    
+
     def make_prompt(self, statement: str, knowledge: str = "") -> str:
         """
         Creat the prompt for a given atom and previous retrieved results.
@@ -71,18 +74,20 @@ class QueryBuilder:
                 _STATEMENT_PLACEHOLDER=statement,
                 _KNOWLEDGE_PLACEHOLDER=knowledge,
                 _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
-                _PROMPT_END_PLACEHOLDER=self.prompt_end, 
+                _PROMPT_END_PLACEHOLDER=self.prompt_end,
             )
         elif self.prompt_version == "v2":
             prompt = QUERY_BUILDER_PROMPT_V2.format(
                 _STATEMENT_PLACEHOLDER=statement,
                 _KNOWLEDGE_PLACEHOLDER=knowledge,
                 _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
-                _PROMPT_END_PLACEHOLDER=self.prompt_end, 
+                _PROMPT_END_PLACEHOLDER=self.prompt_end,
             )
         else:
-            raise ValueError(f"Unknown prompt version: {self.prompt_version}. "
-                             f"Supported versions are: 'v1', 'v2'.")
+            raise ValueError(
+                f"Unknown prompt version: {self.prompt_version}. "
+                f"Supported versions are: 'v1', 'v2'."
+            )
 
         return prompt
 
@@ -95,7 +100,7 @@ class QueryBuilder:
                 The input statement (e.g., an atomic unit).
             knowledge: str
                 The input knowledge, i.e., a list of previuos queries and results.
-        
+
         Return:
             A dict containg the `query` and the verbose `response`.
         """
@@ -108,7 +113,9 @@ class QueryBuilder:
         assert query is not None and len(query) > 0, f"Could not generate the `query`."
         return dict(query=query, response=generated_text)
 
-    def runall(self, statements: List[str], knowledges: List[str]) -> List[Dict[str, str]]:
+    def runall(
+        self, statements: List[str], knowledges: List[str]
+    ) -> List[Dict[str, str]]:
         """
         Generate the queries for a list of statements and knowledges (if any).
 
@@ -117,34 +124,39 @@ class QueryBuilder:
                 The list of input statements (e.g., atomic units).
             knowledges: List[str]
                 The list of input knowledges (previuos queries and results).
-        
+
         Return:
             A list of dicts containg the `query` and the verbose `response`.
         """
 
         # Safety checks
-        assert len(statements) == len(knowledges), \
-            f"Length of `statements` must be equal to the length of `knowledges`."
-        
-        prompts = [self.make_prompt(statements[i], knowledges[i]) for i in range(len(statements))]
+        assert len(statements) == len(
+            knowledges
+        ), f"Length of `statements` must be equal to the length of `knowledges`."
+
+        prompts = [
+            self.make_prompt(statements[i], knowledges[i])
+            for i in range(len(statements))
+        ]
         generated_texts = []
         for _, response in tqdm(
-            enumerate(
-                self.llm_handler.batch_completion(prompts)
-            ),
+            enumerate(self.llm_handler.batch_completion(prompts)),
             total=len(prompts),
             desc="Query Builder",
             unit="prompts",
-            ):
-                generated_texts.append(response.choices[0].message.content)
+        ):
+            generated_texts.append(response.choices[0].message.content)
 
         result = []
         for generated_text in generated_texts:
             query = extract_last_square_brackets(generated_text)
-            assert query is not None and len(query) > 0, f"Could not generate the `query`."
+            assert (
+                query is not None and len(query) > 0
+            ), f"Could not generate the `query`."
             result.append(dict(query=query, response=generated_text))
 
         return result
+
 
 if __name__ == "__main__":
 
@@ -169,7 +181,7 @@ if __name__ == "__main__":
     # print(f"Generating queries for multiple atoms...")
     # print("-------"*10)
     # atoms = [
-    #     "Lanny Flaherty was born in Pensacola, Florida", 
+    #     "Lanny Flaherty was born in Pensacola, Florida",
     #     "Vitamin C is taken from oranges.",
     #     "Ko Itakura is a professional football player.",
     #     "Rin Iwanaga is a fictional character.",
@@ -190,6 +202,5 @@ if __name__ == "__main__":
     #     print(f"Response: {response}")
     #     print(f"Query: {query}")
     #     print("-------"*10)
-
 
     print("Done.")
