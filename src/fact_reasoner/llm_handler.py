@@ -231,7 +231,11 @@ class LLMHandler:
             )
         elif self.backend == "bedrock":
 
-            bedrock_client = BedrockLlamaWithLogprobsClient(model_arn=self.model_id)
+            bedrock_client = BedrockLlamaWithLogprobsClient(
+                model_arn=self.model_id,
+                prompt_begin=self.prompt_begin,
+                prompt_end=self.prompt_end,
+            )
             return bedrock_client.completion(prompts, **params)
 
             # params["logprobs"] = True

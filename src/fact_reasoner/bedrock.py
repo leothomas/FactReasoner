@@ -32,8 +32,16 @@ class BedrockLlamaWithLogprobsClient:
       - if prompts is list -> List[ModelResponse]
     """
 
-    def __init__(self, model_arn: str, region: str = "us-east-1"):
+    def __init__(
+        self,
+        model_arn: str,
+        prompt_begin: str,
+        prompt_end: str,
+        region: str = "us-east-1",
+    ):
         self.model_arn = model_arn
+        self.prompt_begin = prompt_begin
+        self.prompt_end = prompt_end
 
         config = Config(
             region_name=region,
@@ -68,7 +76,7 @@ class BedrockLlamaWithLogprobsClient:
         # assume it's an iterable of strings
         responses: List[ModelResponse] = []
 
-        with futures.ThreadPoolExecutor(max_workers=20) as executor:
+        with futures.ThreadPoolExecutor(max_workers=25) as executor:
             executor.map(
                 lambda prompt: responses.append(
                     self._single_completion(
@@ -89,6 +97,12 @@ class BedrockLlamaWithLogprobsClient:
         #     )
         return responses
 
+    def render_prompt(self, user_input: str) -> str:
+        """
+        Renders the full prompt given user input, using the prompt template and prompt end.
+        """
+        return f"{self.prompt_begin}\n\n{user_input}{self.prompt_end}"
+
     def _single_completion(
         self,
         prompt: str,
@@ -101,21 +115,27 @@ class BedrockLlamaWithLogprobsClient:
         - Converts the response into a LiteLLM ModelResponse
         """
 
+        STOP = "<|eot_id|>"
+
         body = {
-            "prompt": prompt,
+            "prompt": f"{self.render_prompt(prompt)}{STOP}",
             "max_gen_len": max_gen_len,
             "temperature": temperature,
             "return_logprobs": True,
         }
 
         start = time.time()
-
-        resp = self.client.invoke_model(
-            modelId=self.model_arn,
-            body=json.dumps(body),
-            contentType="application/json",
-            accept="application/json",
-        )
+        try:
+            resp = self.client.invoke_model(
+                modelId=self.model_arn,
+                body=json.dumps(body),
+                contentType="application/json",
+                accept="application/json",
+            )
+        except self.client.exceptions.ModelNotReadyException:
+            raise Exception(
+                "Error: Bedrock model is not ready. Please try again in a few minutes"
+            )
 
         print(
             f"[BEDROCK INVOKE MODEL LATENCY]: {round(time.time() - start, 4)} seconds"
@@ -123,6 +143,10 @@ class BedrockLlamaWithLogprobsClient:
 
         raw_bytes = resp["body"].read()
         payload = json.loads(raw_bytes)
+
+        payload["generation"] = payload["generation"].split(STOP, 1)[0]
+
+        # print(f"[BEDROCK RAW RESPONSE]: {json.dumps(payload)}")
 
         # Example payload shape:
         # {
