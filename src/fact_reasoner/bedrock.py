@@ -4,6 +4,7 @@ import json
 import time
 import uuid
 from typing import List, Union
+from concurrent import futures
 
 import boto3
 from botocore.config import Config
@@ -66,14 +67,26 @@ class BedrockLlamaWithLogprobsClient:
 
         # assume it's an iterable of strings
         responses: List[ModelResponse] = []
-        for p in prompts:
-            responses.append(
-                self._single_completion(
-                    prompt=p,
-                    temperature=temperature,
-                    max_gen_len=max_gen_len,
+
+        with futures.ThreadPoolExecutor(max_workers=20) as executor:
+            executor.map(
+                lambda prompt: responses.append(
+                    self._single_completion(
+                        prompt=prompt,
+                        temperature=temperature,
+                        max_gen_len=max_gen_len,
+                    )
                 )
             )
+
+        # for p in prompts:
+        #     responses.append(
+        #         self._single_completion(
+        #             prompt=p,
+        #             temperature=temperature,
+        #             max_gen_len=max_gen_len,
+        #         )
+        #     )
         return responses
 
     def _single_completion(
