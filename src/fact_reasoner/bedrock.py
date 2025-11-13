@@ -95,11 +95,17 @@ class BedrockLlamaWithLogprobsClient:
             "return_logprobs": True,
         }
 
+        start = time.time()
+
         resp = self.client.invoke_model(
             modelId=self.model_arn,
             body=json.dumps(body),
             contentType="application/json",
             accept="application/json",
+        )
+
+        print(
+            f"[BEDROCK INVOKE MODEL LATENCY]: {round(time.time() - start, 4)} seconds"
         )
 
         raw_bytes = resp["body"].read()

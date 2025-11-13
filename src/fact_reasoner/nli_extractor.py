@@ -34,13 +34,14 @@ from src.fact_reasoner.prompts import (
 from src.fact_reasoner.utils import dotdict, extract_last_square_brackets
 
 # Define the NLI relationships (labels)
-NLI_LABELS = ['entailment', 'contradiction', 'neutral']
+NLI_LABELS = ["entailment", "contradiction", "neutral"]
+
 
 def similarity(a, b):
     """Calculate the similarity ratio between two strings using SequenceMatcher.
-    
+
     Args:
-        a: str 
+        a: str
             The first string.
         b: str
             The second string.
@@ -49,6 +50,7 @@ def similarity(a, b):
         float: The similarity ratio between the two strings, ranging from 0 to 1.
     """
     return SequenceMatcher(None, a, b).ratio()
+
 
 def get_label_probability(samples: list, labels: list):
     """Get the label with the highest average similarity to the samples.
@@ -68,10 +70,11 @@ def get_label_probability(samples: list, labels: list):
     candidates = sorted(candidates, key=itemgetter(1), reverse=True)
     return candidates[0]
 
+
 def reverse_enum(L):
     """
     Reverse enumerate a list, yielding index and value pairs in reverse order.
-    
+
     Args:
         L: list
             The list to reverse enumerate.
@@ -94,15 +97,15 @@ class NLIExtractor:
     v2 - more recent (with reasoning)
     v3 - only for Google search results
     """
-    
+
     def __init__(
-            self,
-            model_id: str = "llama-3.1-70b-instruct",
-            method: str = "logprobs",
-            prompt_version: str = "v1",
-            debug: bool = False,
-            backend: str = "rits",
-            inference_batch_size = 8,
+        self,
+        model_id: str = "llama-3.1-70b-instruct",
+        method: str = "logprobs",
+        prompt_version: str = "v1",
+        debug: bool = False,
+        backend: str = "rits",
+        inference_batch_size=8,
     ):
         """
         Initialize the NLIExtractor.
@@ -130,10 +133,12 @@ class NLIExtractor:
         self.llm_handler = LLMHandler(model_id, backend)
         self.prompt_begin = self.llm_handler.get_prompt_begin()
         self.prompt_end = self.llm_handler.get_prompt_end()
-    
+
         if self.prompt_version not in ["v1", "v2", "v3"]:
-            raise ValueError(f"Unknown prompt version: {self.prompt_version}. "
-                                f"Supported versions are: 'v1', 'v2', 'v3'.")
+            raise ValueError(
+                f"Unknown prompt version: {self.prompt_version}. "
+                f"Supported versions are: 'v1', 'v2', 'v3'."
+            )
 
         print(f"[NLIExtractor] Using LLM on {self.backend}: {self.model_id}")
         print(f"[NLIExtractor] Prompt version: {self.prompt_version}")
@@ -141,7 +146,7 @@ class NLIExtractor:
     def make_prompt(self, premise: str, hypothesis: str) -> str:
         """
         Create the prompt for NLI extraction based on the premise and hypothesis.
-        
+
         Args:
             premise: str
                 The premise text.
@@ -150,22 +155,22 @@ class NLIExtractor:
         Returns:
             str: The formatted prompt string.
         """
-        
+
         if self.prompt_version == "v1":
             prompt = NLI_EXTRACTION_PROMPT_V1.format(
                 _PREMISE_PLACEHOLDER=premise,
                 _HYPOTHESIS_PLACEHOLDER=hypothesis,
                 _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
-                _PROMPT_END_PLACEHOLDER=self.prompt_end
+                _PROMPT_END_PLACEHOLDER=self.prompt_end,
             )
         elif self.prompt_version == "v2":
             prompt = NLI_EXTRACTION_PROMPT_V2.format(
                 _PREMISE_PLACEHOLDER=premise,
                 _HYPOTHESIS_PLACEHOLDER=hypothesis,
                 _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
-                _PROMPT_END_PLACEHOLDER=self.prompt_end
+                _PROMPT_END_PLACEHOLDER=self.prompt_end,
             )
-        elif self.prompt_version == "v3": # specific to Google search results (links)
+        elif self.prompt_version == "v3":  # specific to Google search results (links)
             # Set the few-shots section
             few_shots_lst = []
             for dict_item in NLI_EXTRACTION_PROMPT_V3_FEW_SHOTS:
@@ -179,7 +184,7 @@ class NLIExtractor:
                 _SEARCH_RESULTS_PLACEHOLDER=premise,
                 _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
                 _PROMPT_END_PLACEHOLDER=self.prompt_end,
-                *few_shots_lst
+                *few_shots_lst,
             )
 
         return prompt
@@ -187,7 +192,7 @@ class NLIExtractor:
     def extract_relationship(self, text: str, logprobs: List[dict]):
         """
         Extract the relationship and probability. The relationship should be on
-        the last line of the generated text and one of the following: 
+        the last line of the generated text and one of the following:
             [entailment], [contradiction] or [neutral]. Anything
         else will be assumed to be neutral with probability 1. The probability
         of the relationship is the exp of the average logprob of the corresponding
@@ -204,30 +209,34 @@ class NLIExtractor:
 
         if self.prompt_version == "v1":
             label = text.strip().lower()
-            if label not in ['entailment', 'contradiction', 'neutral']:
-                label = 'neutral' #'invalid_label'
+            if label not in ["entailment", "contradiction", "neutral"]:
+                label = "neutral"  #'invalid_label'
                 probability = 1.0
             else:
                 logprob_sum = 0.0
                 generated_tokens = logprobs[:-1]
-                for token in generated_tokens: #last token is just <|eot_id|>
+                for token in generated_tokens:  # last token is just <|eot_id|>
                     token = dotdict(token)
-                    logprob_sum +=token.logprob
+                    logprob_sum += token.logprob
 
-                probability = float(np.exp(logprob_sum/len(generated_tokens)))
+                probability = float(np.exp(logprob_sum / len(generated_tokens)))
         elif self.prompt_version == "v2":
             label = extract_last_square_brackets(text).lower()
             probability = 1.0
-            if len(label) == 0 or label not in ['entailment', 'contradiction', 'neutral']:
-                label = 'neutral'
+            if len(label) == 0 or label not in [
+                "entailment",
+                "contradiction",
+                "neutral",
+            ]:
+                label = "neutral"
             else:
                 # Look for the tokens corresponding to the label [label]
                 logits = []
                 for _, elem in reverse_enum(logprobs):
                     elem = dotdict(elem)
-                    if elem.token in ['', '\n', ']']:
+                    if elem.token in ["", "\n", "]"]:
                         continue
-                    if elem.token in ['[']:
+                    if elem.token in ["["]:
                         break
                     logits.append(elem.logprob)
 
@@ -236,16 +245,20 @@ class NLIExtractor:
         elif self.prompt_version == "v3":
             label = extract_last_square_brackets(text).lower()
             probability = 1.0
-            if len(label) == 0 or label not in ['supported', 'contradicted', 'inconclusive']:
-                label = 'neutral'
+            if len(label) == 0 or label not in [
+                "supported",
+                "contradicted",
+                "inconclusive",
+            ]:
+                label = "neutral"
             else:
                 # Look for the tokens corresponding to the label [label]
                 logits = []
-                for elem in reverse_enum(logprobs): # loop from the end
+                for elem in reverse_enum(logprobs):  # loop from the end
                     elem = dotdict(elem)
-                    if elem.token in ['', '\n', ']']:
+                    if elem.token in ["", "\n", "]"]:
                         continue
-                    if elem.token in ['[']:
+                    if elem.token in ["["]:
                         break
                     logits.append(elem.logprob)
 
@@ -263,8 +276,8 @@ class NLIExtractor:
 
     def extract_relationship_dict(self, response: dict):
         """
-        The input is a dictionary: {'entailment': 0.9952232241630554, 
-                                    'contradiction': 0.00199194741435349, 
+        The input is a dictionary: {'entailment': 0.9952232241630554,
+                                    'contradiction': 0.00199194741435349,
                                     'neutral': 0.002784877549856901}
         """
         label = max(response.items(), key=operator.itemgetter(1))[0]
@@ -275,75 +288,78 @@ class NLIExtractor:
     def run(self, premise: str, hypothesis: str):
         """
         Extract the NLI relationship between a premise and a hypothesis.
-        
+
         Args:
             premise: str
                 The premise text.
             hypothesis: str
                 The hypothesis text.
-        
+
         Returns:
             dict: A dictionary containing the label and its probability.
         """
-        
+
         prompt = self.make_prompt(premise, hypothesis)
         print(f"[NLIExtractor] Prompt created ({len(prompt)}).")
-        response = self.llm_handler.completion(
-            prompt,
-            logprobs=True
-        )
+        response = self.llm_handler.completion(prompt, logprobs=True)
 
         text = response.choices[0].message.content
         if self.debug:
             print(f"Generate response:\n{text}")
-        logprobs = response.choices[0].logprobs['content']
+        logprobs = response.choices[0].logprobs["content"]
         label, probability = self.extract_relationship(text, logprobs)
-        result = {'label': label, 'probability': probability}
+        result = {"label": label, "probability": probability}
 
         return result
-    
+
     def runall(self, premises: List[str], hypotheses: List[str]):
         """
         Extract the NLI relationships for a list of premises and hypotheses.
-        
+
         Args:
             premises: List[str]
                 A list of premise texts.
             hypotheses: List[str]
                 A list of hypothesis texts.
         Returns:
-            List[dict]: A list of dictionaries, each containing the label and 
+            List[dict]: A list of dictionaries, each containing the label and
             its probability for each premise-hypothesis pair.
         """
-        
+
         # Safety checks
-        assert len(premises) == len(hypotheses), "Premises and hypotheses must have the same length."
+        assert len(premises) == len(
+            hypotheses
+        ), "Premises and hypotheses must have the same length."
 
         generated_texts = []
         generated_logprobs = []
-        prompts = [self.make_prompt(premise, hypothesis) for premise, hypothesis in zip(premises, hypotheses)]
+        prompts = [
+            self.make_prompt(premise, hypothesis)
+            for premise, hypothesis in zip(premises, hypotheses)
+        ]
         print(f"[NLIExtractor] Prompts created: {len(prompts)}")
 
-        batched_prompts = [prompts[i:i + self.inference_batch_size] for i in range(0, len(prompts), self.inference_batch_size)]
+        batched_prompts = [
+            prompts[i : i + self.inference_batch_size]
+            for i in range(0, len(prompts), self.inference_batch_size)
+        ]
 
         for batch_idx, current_batch in tqdm(
             enumerate(batched_prompts),
             total=len(batched_prompts),
             desc="NLI (batches)",
-            unit="batches"
-            ):
-                #responses = self.llm_handler.batch_completion(current_batch, logprobs=True, seed=12345)
-                responses = self.llm_handler.batch_completion(
-                    current_batch,
-                    logprobs=True,
-                    seed=12345,
-                )
+            unit="batches",
+        ):
+            # responses = self.llm_handler.batch_completion(current_batch, logprobs=True, seed=12345)
+            responses = self.llm_handler.batch_completion(
+                current_batch,
+                logprobs=True,
+                seed=12345,
+            )
 
-                print("GENERATED RESPONSE: ", responses)
-
-                for response in responses:
-                    generated_texts.append(response.choices[0].message.content)
-                    generated_logprobs.append(response.choices[0].logprobs['content'])
+            for response in responses:
+                generated_texts.append(response.choices[0].message.content)
+                generated_logprobs.append(response.choices[0].logprobs["content"])
 
         results = []
         for text, logprobs in zip(generated_texts, generated_logprobs):
@@ -363,7 +379,7 @@ if __name__ == "__main__":
     hypothesis = "Lanny Flaherty has appeared in numerous films."
 
     # Create the extractor
-    extractor = NLIExtractor(model_id=model_id, prompt_version="v2", backend=backend)    
+    extractor = NLIExtractor(model_id=model_id, prompt_version="v2", backend=backend)
     result = extractor.run(premise=premise, hypothesis=hypothesis)
 
     # Output results
