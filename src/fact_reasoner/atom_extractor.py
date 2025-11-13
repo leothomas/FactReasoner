@@ -251,7 +251,9 @@ class AtomExtractor(object):
         # print(f"units: {units}, labels: {labels}")
         units_as_dict = convert_atomic_units_to_dicts_(labels, units)
         facts_as_dict = [
-            unit for unit in units_as_dict if unit[_LABEL].lower() in ["fact", "claim"]
+            unit
+            for unit in units_as_dict
+            if unit[_LABEL].lower() in ["fact", "claim", "data format"]
         ]
 
         return {
