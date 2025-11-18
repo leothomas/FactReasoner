@@ -194,8 +194,6 @@ class AtomExtractor(object):
             List[str]: A list of labels corresponding to the atomic units.
         """
 
-        print(f"[AtomExtractor] Prompts created: 1")
-
         prompt = self.make_prompt(response)
         response = self.llm_handler.completion(prompt)
         output = response.choices[0].message.content

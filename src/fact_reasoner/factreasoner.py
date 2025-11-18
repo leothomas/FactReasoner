@@ -50,9 +50,9 @@ from src.fact_reasoner.fact_utils import (
 from src.fact_reasoner.nli_extractor import NLIExtractor
 from src.fact_reasoner.query_builder import QueryBuilder
 
-# Set logging levels 
+# Set logging levels
 # pgmpy set the root logger to INFO -- changed it to WARNING
-os.environ["LITELLM_LOG"] = 'ERROR'
+os.environ["LITELLM_LOG"] = "ERROR"
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("datasets").setLevel(logging.WARNING)
 logging.getLogger("sentence_transformers.SentenceTransformer").setLevel(logging.WARNING)
@@ -62,16 +62,16 @@ logging.getLogger("pgmpy").setLevel(logging.WARNING)
 
 class FactReasoner:
     def __init__(
-            self,
-            context_retriever: ContextRetriever = None,
-            context_summarizer: ContextSummarizer = None,
-            atom_extractor: AtomExtractor = None,
-            atom_reviser: AtomReviser = None,
-            nli_extractor: NLIExtractor = None,
-            query_builder: QueryBuilder = None,
-            merlin_path: str = None,
-            debug_mode: bool = False,
-            use_priors: bool = True,
+        self,
+        context_retriever: ContextRetriever = None,
+        context_summarizer: ContextSummarizer = None,
+        atom_extractor: AtomExtractor = None,
+        atom_reviser: AtomReviser = None,
+        nli_extractor: NLIExtractor = None,
+        query_builder: QueryBuilder = None,
+        merlin_path: str = None,
+        debug_mode: bool = False,
+        use_priors: bool = True,
     ):
         """
         Construct the FactReasoner pipeline.
@@ -136,10 +136,7 @@ class FactReasoner:
         self.labels_chatgpt = None
         self.labels_llamanp = None
 
-    def from_fact_graph(
-            self,
-            fact_graph: FactGraph
-    ):
+    def from_fact_graph(self, fact_graph: FactGraph):
         """
         Create a FactReasoner instance from a FactGraph instance.
 
@@ -155,16 +152,9 @@ class FactReasoner:
 
         for node_id, node in fact_graph.nodes.items():
             if node.type == "atom":
-                self.atoms[node_id] = Atom(
-                    id=node_id,
-                    text=""
-                )
+                self.atoms[node_id] = Atom(id=node_id, text="")
             elif node.type == "context":
-                self.contexts[node_id] = Context(
-                    id=node_id,
-                    atom=None,
-                    text=""
-                )
+                self.contexts[node_id] = Context(id=node_id, atom=None, text="")
 
         for edge in fact_graph.edges:
             id_source = edge.source
@@ -183,7 +173,7 @@ class FactReasoner:
                 target=trg,
                 type=edge.type,
                 probability=edge.probability,
-                link=edge.link
+                link=edge.link,
             )
 
             self.relations.append(rel)
@@ -195,8 +185,8 @@ class FactReasoner:
         self._build_markov_network()
 
     def from_dict_with_contexts(
-            self,
-            data: dict,
+        self,
+        data: dict,
     ):
         """
         Create a problem instance from a dict containing both atoms and contexts.
@@ -241,7 +231,9 @@ class FactReasoner:
             text = context_dict["text"]
             snippet = context_dict.get("snippet", "")
             link = context_dict.get("link", "")
-            ctxt = Context(id=cid, atom=None, text=text, title=title, snippet=snippet, link=link)
+            ctxt = Context(
+                id=cid, atom=None, text=text, title=title, snippet=snippet, link=link
+            )
             self.contexts[cid] = ctxt
 
         print(f"[FactReasoner] Contexts retrieved: {len(self.contexts.keys())}")
@@ -254,19 +246,19 @@ class FactReasoner:
         return True
 
     def build(
-            self,
-            response: str = None,
-            debug_mode: bool = False,
-            has_atoms: bool = False,
-            has_contexts: bool = False,
-            revise_atoms: bool = True,
-            remove_duplicates: bool = False,
-            summarize_contexts: bool = False,
-            contexts_per_atom_only: bool = False,
-            rel_atom_context: bool = True,
-            rel_context_context: bool = True,
-            question: str = None,
-            text_only: bool = True
+        self,
+        response: str = None,
+        debug_mode: bool = False,
+        has_atoms: bool = False,
+        has_contexts: bool = False,
+        revise_atoms: bool = True,
+        remove_duplicates: bool = False,
+        summarize_contexts: bool = False,
+        contexts_per_atom_only: bool = False,
+        rel_atom_context: bool = True,
+        rel_context_context: bool = True,
+        question: str = None,
+        text_only: bool = True,
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -316,18 +308,20 @@ class FactReasoner:
         # Output some info
         print(f"[FactReasoner] Building the pipeline instance ...")
         print(f"[FactReasoner] Using text only contexts: {text_only}")
-        
+
         # Stage 1: decompose the response into atomic units (Atomizer)
         if has_atoms == False:
-            assert self.response is not None, f"Response cannot be None for decomposition!"
+            assert (
+                self.response is not None
+            ), f"Response cannot be None for decomposition!"
             self.atoms = build_atoms(
-                response=self.response,
-                atom_extractor=self.atom_extractor
+                response=self.response, atom_extractor=self.atom_extractor
             )
 
         # Safety checks
-        assert (len(self.atoms.keys()) > 0 or not has_atoms), \
-            f"Atoms must be initialized if `has_atoms` is True!"
+        assert (
+            len(self.atoms.keys()) > 0 or not has_atoms
+        ), f"Atoms must be initialized if `has_atoms` is True!"
 
         # Stage 2: revise the atomic units to be self-contained (Reviser)
         if revise_atoms:
@@ -341,84 +335,111 @@ class FactReasoner:
                 print(self.atoms[aid])
 
         self.atoms = remove_duplicated_atoms(self.atoms)
-        
+
         # Stage 3: Build contexts (ContextRtriever)
         if not has_contexts:
             self.contexts = build_contexts(
-                atoms=self.atoms,
-                question=question,
-                retriever=self.context_retriever
+                atoms=self.atoms, question=question, retriever=self.context_retriever
             )
 
         # for tracking purposes
-        self.num_retrieved_contexts = len(self.contexts.keys()) 
+        self.num_retrieved_contexts = len(self.contexts.keys())
 
         # Safety checks
-        assert (len(self.contexts.keys()) > 0 or not has_contexts), \
-            f"Contexts must be initialized if `has_contexts` is True!"
-        
+        assert (
+            len(self.contexts.keys()) > 0 or not has_contexts
+        ), f"Contexts must be initialized if `has_contexts` is True!"
+
         if remove_duplicates:
-            self.contexts, self.atoms = remove_duplicated_contexts(self.contexts, self.atoms)
+            self.contexts, self.atoms = remove_duplicated_contexts(
+                self.contexts, self.atoms
+            )
             print(f"[FactReasoner] Found {len(self.contexts.keys())} unique contexts.")
 
-        # Summarize contexts given atoms       
+        # Summarize contexts given atoms
         if summarize_contexts:
-            print(f"[FactReasoner] Summarizing the contexts ...")
+
             for atom_id, atom in self.atoms.items():
                 if len(atom.contexts.keys()) > 0:
-                    contexts_ids, contexts =  zip(*atom.contexts.items()) 
+                    contexts_ids, contexts = zip(*atom.contexts.items())
                     # 1 round of summarization instead of 2 rounds
-                    results = self.context_summarizer.run([context.get_snippet_and_text() for context in contexts], atom.text) 
-                    # results2 = self.context_summarizer.run([result["summary"] for result in results], atom.text) 
+                    results = self.context_summarizer.run(
+                        [context.get_snippet_and_text() for context in contexts],
+                        atom.text,
+                    )
+
+                    # results2 = self.context_summarizer.run([result["summary"] for result in results], atom.text)
 
                     # for context_id, result, result2 in zip(contexts_ids, results, results2):
                     for context_id, result in zip(contexts_ids, results):
+
                         is_relevant = is_relevant_context(result["summary"])
+
                         # if result2["summary"] != "":
                         if result["summary"] != "" and is_relevant:
                             # self.contexts[context_id].set_synthetic_summary(result2["summary"])
-                            self.contexts[context_id].set_synthetic_summary(result["summary"])
+                            self.contexts[context_id].set_synthetic_summary(
+                                result["summary"]
+                            )
                             # update prior probability of context based on the confidence estimation of the summary
                             # self.contexts[context_id].set_probability(result["probability"] * result2["probability"] * self.contexts[context_id].get_probability())
-                            self.contexts[context_id].set_probability(result["probability"] * self.contexts[context_id].get_probability())
+                            self.contexts[context_id].set_probability(
+                                result["probability"]
+                                * self.contexts[context_id].get_probability()
+                            )
                         else:
                             # we remove the context because it is not related to the atom
                             del self.contexts[context_id]
                             del self.atoms[atom_id].contexts[context_id]
 
             # summarize contexts for question
-            
+
             # first get contexts for the question
-            c_qs = {c_id: context for c_id, context in self.contexts.items() if c_id.startswith("c_q")} 
+            c_qs = {
+                c_id: context
+                for c_id, context in self.contexts.items()
+                if c_id.startswith("c_q")
+            }
             if len(c_qs.keys()) > 0:
-                contexts_ids, contexts =  zip(*c_qs.items()) 
+                contexts_ids, contexts = zip(*c_qs.items())
                 # 1 round of summarization instead of 2 rounds
-                results = self.context_summarizer.run([context.get_snippet_and_text() for context in contexts], question) 
-                # results2 = self.context_summarizer.run([result["summary"] for result in results], question) 
+                results = self.context_summarizer.run(
+                    [context.get_snippet_and_text() for context in contexts], question
+                )
+                # results2 = self.context_summarizer.run([result["summary"] for result in results], question)
 
                 # for context_id, result, result2 in zip(contexts_ids, results, results2):
                 for context_id, result in zip(contexts_ids, results):
+
                     is_relevant = is_relevant_context(result["summary"])
                     # if result2["summary"] != "":
                     if result["summary"] != "" and is_relevant:
                         # self.contexts[context_id].set_synthetic_summary(result2["summary"])
-                        self.contexts[context_id].set_synthetic_summary(result["summary"])
+                        self.contexts[context_id].set_synthetic_summary(
+                            result["summary"]
+                        )
                         # update prior probability of context based on the confidence estimation of the summary
                         # self.contexts[context_id].set_probability(result["probability"] * result2["probability"] * self.contexts[context_id].get_probability())
-                        self.contexts[context_id].set_probability(result["probability"] * self.contexts[context_id].get_probability())
+                        self.contexts[context_id].set_probability(
+                            result["probability"]
+                            * self.contexts[context_id].get_probability()
+                        )
                     else:
                         # we remove the context because it is not related to the atom
                         del self.contexts[context_id]
-                              
+
         else:
             for context_id in self.contexts.keys():
-                self.contexts[context_id].set_synthetic_summary(self.contexts[context_id].get_snippet_and_text()) 
+                self.contexts[context_id].set_synthetic_summary(
+                    self.contexts[context_id].get_snippet_and_text()
+                )
 
         # for tracking purposes
-        self.num_summarized_contexts = len(self.contexts.keys()) 
+        self.num_summarized_contexts = len(self.contexts.keys())
 
         # Stage 4: Extract NLI relationships (Evaluator)
         if self.num_summarized_contexts > 0 and len(self.atoms.keys()) > 0:
+
             # Build the NLI relationships
             self.relations = build_relations(
                 atoms=self.atoms,
@@ -437,12 +458,17 @@ class FactReasoner:
 
             print(f"[FactReasoner] Pipeline instance created.")
         elif self.num_summarized_contexts == 0 and len(self.atoms.keys()) == 0:
-            print(f"[FactReasoner] Could not create fact graph because no relevant contexts were retrieved and no atoms are available.")
+            print(
+                f"[FactReasoner] Could not create fact graph because no relevant contexts were retrieved and no atoms are available."
+            )
         elif self.num_summarized_contexts == 0:
-            print(f"[FactReasoner] Could not create fact graph because no relevant contexts were retrieved.")
+            print(
+                f"[FactReasoner] Could not create fact graph because no relevant contexts were retrieved."
+            )
         else:
-            print(f"[FactReasoner] Could not create fact graph because no atoms are available.")
-
+            print(
+                f"[FactReasoner] Could not create fact graph because no atoms are available."
+            )
 
     def pipeline_to_json(self, json_file_path: str = None):
         """
@@ -464,7 +490,9 @@ class FactReasoner:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
 
-        data["contexts"] = [context.context_to_json() for context in self.contexts.values()]
+        data["contexts"] = [
+            context.context_to_json() for context in self.contexts.values()
+        ]
 
         if json_file_path:
             with open(json_file_path, "w") as f:
@@ -496,7 +524,7 @@ class FactReasoner:
         self.fact_graph = FactGraph(
             atoms=list(self.atoms.values()),
             contexts=list(self.contexts.values()),
-            relations=self.relations
+            relations=self.relations,
         )
 
     def _build_markov_network(self):
@@ -518,20 +546,16 @@ class FactReasoner:
             x = node.id
             self.markov_network.add_node(x)
             if node.type == "context":
-                prob = node.probability  #PRIOR_PROB_CONTEXT
+                prob = node.probability  # PRIOR_PROB_CONTEXT
                 factor = DiscreteFactor(
-                    variables=[x],
-                    cardinality=[2],
-                    values=[1.0 - prob, prob]
+                    variables=[x], cardinality=[2], values=[1.0 - prob, prob]
                 )
                 self.markov_network.add_factors(factor)
                 print(f"Adding context variable {x} with discrete factor (prior)")
             elif node.type == "atom":
                 prob = node.probability  # PRIOR_PROB_ATOM
                 factor = DiscreteFactor(
-                    variables=[x],
-                    cardinality=[2],
-                    values=[1.0 - prob, prob]
+                    variables=[x], cardinality=[2], values=[1.0 - prob, prob]
                 )
                 self.markov_network.add_factors(factor)
                 print(f"Adding atom variable {x} with discrete factor (prior)")
@@ -546,21 +570,36 @@ class FactReasoner:
                 prob = edge.probability
                 if self.use_priors:
                     if edge.link == "context_atom":
-                        values = [1.0 - PRIOR_PROB_ATOM, PRIOR_PROB_ATOM, 1.0 - prob, prob]
+                        values = [
+                            1.0 - PRIOR_PROB_ATOM,
+                            PRIOR_PROB_ATOM,
+                            1.0 - prob,
+                            prob,
+                        ]
                     elif edge.link == "context_context":
-                        values = [1.0 - PRIOR_PROB_CONTEXT, PRIOR_PROB_CONTEXT, 1.0 - prob, prob]
+                        values = [
+                            1.0 - PRIOR_PROB_CONTEXT,
+                            PRIOR_PROB_CONTEXT,
+                            1.0 - prob,
+                            prob,
+                        ]
                     elif edge.link == "atom_atom":
-                        values = [1.0 - PRIOR_PROB_ATOM, PRIOR_PROB_ATOM, 1.0 - prob, prob]
+                        values = [
+                            1.0 - PRIOR_PROB_ATOM,
+                            PRIOR_PROB_ATOM,
+                            1.0 - prob,
+                            prob,
+                        ]
                     else:
                         raise ValueError(f"Unknown link type: {edge.link}")
                 else:
                     values = [prob, prob, 1.0 - prob, prob]
 
-                # Create the factor    
+                # Create the factor
                 factor = DiscreteFactor(
                     variables=[x, y],
                     cardinality=[2, 2],
-                    values=values  #[prob, prob, 1.0 - prob, prob]
+                    values=values,  # [prob, prob, 1.0 - prob, prob]
                 )
                 self.markov_network.add_factors(factor)
                 print(f"Adding edge {x} - {y} with discrete factor (entailment)")
@@ -568,11 +607,26 @@ class FactReasoner:
                 prob = edge.probability
                 if self.use_priors:
                     if edge.link == "context_atom":
-                        values = [1.0 - PRIOR_PROB_ATOM, PRIOR_PROB_ATOM, prob, 1.0 - prob]
+                        values = [
+                            1.0 - PRIOR_PROB_ATOM,
+                            PRIOR_PROB_ATOM,
+                            prob,
+                            1.0 - prob,
+                        ]
                     elif edge.link == "context_context":
-                        values = [1.0 - PRIOR_PROB_CONTEXT, PRIOR_PROB_CONTEXT, prob, 1.0 - prob]
+                        values = [
+                            1.0 - PRIOR_PROB_CONTEXT,
+                            PRIOR_PROB_CONTEXT,
+                            prob,
+                            1.0 - prob,
+                        ]
                     elif edge.link == "atom_atom":
-                        values = [1.0 - PRIOR_PROB_ATOM, PRIOR_PROB_ATOM, prob, 1.0 - prob]
+                        values = [
+                            1.0 - PRIOR_PROB_ATOM,
+                            PRIOR_PROB_ATOM,
+                            prob,
+                            1.0 - prob,
+                        ]
                     else:
                         raise ValueError(f"Unknown link type: {edge.link}")
                 else:
@@ -581,7 +635,7 @@ class FactReasoner:
                 factor = DiscreteFactor(
                     variables=[x, y],
                     cardinality=[2, 2],
-                    values=values  #[prob, prob, prob, 1.0 - prob]
+                    values=values,  # [prob, prob, prob, 1.0 - prob]
                 )
                 self.markov_network.add_factors(factor)
                 print(f"Adding edge {x} - {y} with discrete factor (contradiction)")
@@ -590,7 +644,7 @@ class FactReasoner:
                 factor = DiscreteFactor(
                     variables=[x, y],
                     cardinality=[2, 2],
-                    values=[prob, 1.0 - prob, 1.0 - prob, prob]
+                    values=[prob, 1.0 - prob, 1.0 - prob, prob],
                 )
                 self.markov_network.add_factors(factor)
                 print(f"Adding edge {x} - {y} with discrete factor (equivalence)")
@@ -636,12 +690,18 @@ class FactReasoner:
 
         args = [
             exefile,
-            "--input-file", input_filename,
-            "--task", task,
-            "--ibound", "6",
-            "--algorithm", algorithm,
-            "--output-format", output_format,
-            "--output-file", output_file
+            "--input-file",
+            input_filename,
+            "--task",
+            task,
+            "--ibound",
+            "6",
+            "--algorithm",
+            algorithm,
+            "--output-format",
+            output_format,
+            "--output-file",
+            output_file,
         ]
 
         proc = subprocess.run(args)
@@ -656,21 +716,25 @@ class FactReasoner:
         for marginal in results["marginals"]:
             var_index = marginal["variable"]
             var_name = vars_mapping[var_index]
-            all_marginals.append(dict(variable=var_name, probabilities=marginal["probabilities"]))
+            all_marginals.append(
+                dict(variable=var_name, probabilities=marginal["probabilities"])
+            )
             if var_name in query_variables:
                 probs = marginal["probabilities"]
                 marginals.append({"variable": var_name, "probabilities": probs})
 
         # Cleanup -- delete input_filename and output_filename
-        if os.path.exists(input_filename): os.remove(input_filename)
-        if os.path.exists(output_filename): os.remove(output_filename)
+        if os.path.exists(input_filename):
+            os.remove(input_filename)
+        if os.path.exists(output_filename):
+            os.remove(output_filename)
 
         print(f"All Marginals:\n{all_marginals}")
         return marginals
 
     def score(self):
         """
-        Compute the factuality score taking into consideration the contexts 
+        Compute the factuality score taking into consideration the contexts
         retrieved for each of the atom in the answer.
 
         Factuality score = # atoms(true) / # atoms
@@ -719,7 +783,7 @@ class FactReasoner:
             print(f"[{var}]: Probability for {var}=1 is: {probs[1]}")
 
             # Check if atom is true or not
-            probabilities[var] = probs[1] # probability of true
+            probabilities[var] = probs[1]  # probability of true
             if probs[1] > probs[0]:
                 num_true_atoms += 1
                 labels[var] = "S"
@@ -737,7 +801,9 @@ class FactReasoner:
             avg_logprob += math.log(probval)
             avg_prob += probval
             entropy += -probval * math.log(probval)
-            norm_entropy += -(probval * math.log(probval) + (1.0 - probval) * math.log(1.0 - probval)) / math.log(2.0)
+            norm_entropy += -(
+                probval * math.log(probval) + (1.0 - probval) * math.log(1.0 - probval)
+            ) / math.log(2.0)
 
             # probval = probs[1] if probs[1] > 0.0 else 1e-6
             # if probval == 0.5:
@@ -768,7 +834,7 @@ class FactReasoner:
         results["avg_entropy"] = avg_entropy
         results["avg_norm_entropy"] = avg_norm_entropy
         results["avg_prob"] = avg_prob
-        results["avg_logprob"] = avg_logprob # math.exp(avg_logprob)
+        results["avg_logprob"] = avg_logprob  # math.exp(avg_logprob)
         results["avg_explogprob"] = math.exp(avg_logprob)
 
         # Print the predicted labels
@@ -779,7 +845,12 @@ class FactReasoner:
 
         # Remove duplicate atoms in self.labels_human
         if self.labels_human is not None:
-            self.labels_human = {k: v for i, (k, v) in enumerate(self.labels_human.items()) if k in self.atoms.keys() and k not in list(self.labels_human.keys())[:i]}
+            self.labels_human = {
+                k: v
+                for i, (k, v) in enumerate(self.labels_human.items())
+                if k in self.atoms.keys()
+                and k not in list(self.labels_human.keys())[:i]
+            }
 
         # Check for ground truth annotations
         if self.labels_human is not None:
@@ -812,7 +883,9 @@ class FactReasoner:
             for aid in sorted(self.labels_human.keys()):
                 str_references += f" {aid}: {self.labels_human[aid]}"
             print(f"[FactReasoner] Gold labels: {str_references}")
-            print(f"[FactReasoner] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human.keys())})")
+            print(
+                f"[FactReasoner] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human.keys())})"
+            )
             results["gold_factuality_score"] = fscore_gold
             results["gold_true_atoms"] = true_atoms
             results["true_positive"] = num_true_positive
@@ -836,19 +909,19 @@ if __name__ == "__main__":
     # CLI arguments
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--input_file',
+        "--input_file",
         type=str,
         default=None,
         required=True,
-        help="Path to the input test file (json)."
+        help="Path to the input test file (json).",
     )
 
     parser.add_argument(
-        '--merlin_path',
+        "--merlin_path",
         type=str,
         default=None,
         required=True,
-        help="Path to the probabilistic inference engine merlin."
+        help="Path to the probabilistic inference engine merlin.",
     )
 
     # Parse CLI arguments
@@ -856,16 +929,24 @@ if __name__ == "__main__":
 
     # Define the model and backend
     model_id = "llama-3.3-70b-instruct"
-    cache_dir = None # "my_database.db"
+    cache_dir = None  # "my_database.db"
     backend = "rits"
 
     # Create the pipeline modules
-    query_builder = QueryBuilder(model_id=model_id, prompt_version="v1", backend=backend)
-    context_retriever = ContextRetriever(service_type="google", top_k=5, cache_dir=cache_dir)
-    context_summarizer = ContextSummarizer(model_id=model_id, prompt_version="v1", backend=backend)
+    query_builder = QueryBuilder(
+        model_id=model_id, prompt_version="v1", backend=backend
+    )
+    context_retriever = ContextRetriever(
+        service_type="google", top_k=5, cache_dir=cache_dir
+    )
+    context_summarizer = ContextSummarizer(
+        model_id=model_id, prompt_version="v1", backend=backend
+    )
     atom_extractor = AtomExtractor(model_id=model_id, backend=backend)
     atom_reviser = AtomReviser(model_id=model_id, backend=backend)
-    nli_extractor = NLIExtractor(model_id=model_id, prompt_version="v1", backend=backend)
+    nli_extractor = NLIExtractor(
+        model_id=model_id, prompt_version="v1", backend=backend
+    )
 
     # Path to merlin (probabilistic inference engine)
     assert args.merlin_path is not None, f"Path to merlin cannot be None. Aborting."
@@ -883,7 +964,9 @@ if __name__ == "__main__":
     )
 
     # Load the problem instance from a file
-    assert args.input_file is not None, f"Path to the input file cannot be None. Aborting."
+    assert (
+        args.input_file is not None
+    ), f"Path to the input file cannot be None. Aborting."
     json_file = args.input_file
     with open(json_file, "r") as f:
         data = json.load(f)
@@ -898,9 +981,9 @@ if __name__ == "__main__":
         revise_atoms=False,
         remove_duplicates=True,
         contexts_per_atom_only=False,
-        rel_atom_context=True, 
+        rel_atom_context=True,
         rel_context_context=False,
-        text_only=False
+        text_only=False,
     )
 
     # Compute the marginals
@@ -908,4 +991,3 @@ if __name__ == "__main__":
     print(f"[FactReasoner] Marginals: {marginals}")
     print(f"[FactReasoner] Results: {results}")
     print(f"Done.")
-

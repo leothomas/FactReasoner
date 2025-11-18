@@ -621,14 +621,16 @@ def is_relevant_context(context: str) -> dict:
     if not all(keyword.lower() not in context_lower for keyword in keywords):
         return False
 
-    try:
-        nltk.data.find("tokenizers/punkt")
-    except LookupError:
-        print("'punkt' not found. Downloading...")
-        nltk.download("punkt")
+    for resource in ("punkt", "punkt_tab"):
+        try:
+            nltk.data.find(f"tokenizers/{resource}")
+        except LookupError:
+            print(f"'{resource}' not found. Downloading...")
+            nltk.download(resource)
 
     sentences = sent_tokenize(context)
     num_sentences = len(sentences)
+
     # we filter out summaries of only one sentence of the form: "the context does not..."
     if (
         num_sentences == 1

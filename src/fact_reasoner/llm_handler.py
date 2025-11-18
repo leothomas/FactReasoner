@@ -18,7 +18,17 @@ import os
 import litellm
 import torch
 from dotenv import load_dotenv
-from vllm import LLM, SamplingParams
+
+# from vllm import LLM, SamplingParams
+
+# Wrap vLLM imports to avoid errors if vLLM is not installed
+# since we're not using VLLM for the BedRock backend
+try:
+    from vllm import LLM, SamplingParams
+except:
+    LLM = None
+    SamplingParams = None
+
 
 # Local imports
 from src.fact_reasoner.utils import (

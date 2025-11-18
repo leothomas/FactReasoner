@@ -55,7 +55,7 @@ class BedrockLlamaWithLogprobsClient:
     def completion(
         self,
         prompts: Union[str, List[str]],
-        max_gen_len: int = 2048,
+        max_gen_len: int = 4096,
         temperature: float = 0.0,
         **kwargs,
     ) -> Union[ModelResponse, List[ModelResponse]]:
@@ -73,28 +73,18 @@ class BedrockLlamaWithLogprobsClient:
                 max_gen_len=max_gen_len,
             )
 
-        # assume it's an iterable of strings
-        responses: List[ModelResponse] = []
-
         with futures.ThreadPoolExecutor(max_workers=25) as executor:
-            executor.map(
-                lambda prompt: responses.append(
-                    self._single_completion(
+            responses = list(
+                executor.map(
+                    lambda prompt: self._single_completion(
                         prompt=prompt,
                         temperature=temperature,
                         max_gen_len=max_gen_len,
-                    )
-                )
+                    ),
+                    prompts,
+                ),
             )
 
-        # for p in prompts:
-        #     responses.append(
-        #         self._single_completion(
-        #             prompt=p,
-        #             temperature=temperature,
-        #             max_gen_len=max_gen_len,
-        #         )
-        #     )
         return responses
 
     def render_prompt(self, user_input: str) -> str:
@@ -136,17 +126,15 @@ class BedrockLlamaWithLogprobsClient:
             raise Exception(
                 "Error: Bedrock model is not ready. Please try again in a few minutes"
             )
+        except Exception as e:
+            print("Unhandled Bedrock exception:", str(e))
 
         print(
-            f"[BEDROCK INVOKE MODEL LATENCY]: {round(time.time() - start, 4)} seconds"
+            f"[BEDROCK] Model response latency: {round(time.time() - start, 4)} seconds"
         )
-
+        request_id = resp["ResponseMetadata"]["RequestId"]
         raw_bytes = resp["body"].read()
         payload = json.loads(raw_bytes)
-
-        payload["generation"] = payload["generation"].split(STOP, 1)[0]
-
-        # print(f"[BEDROCK RAW RESPONSE]: {json.dumps(payload)}")
 
         # Example payload shape:
         # {
@@ -185,8 +173,8 @@ class BedrockLlamaWithLogprobsClient:
         # -------------------------
         if is_native:
             # Native CMI llama schema
-            generation_text = payload.get("generation", "") or ""
-            finish_reason = payload.get("stop_reason", "stop") or "stop"
+            generation_text = payload.get("generation", "").split(STOP, 1)[0]
+            finish_reason = payload.get("stop_reason", "stop")
 
             prompt_tokens = int(payload.get("prompt_token_count", 0) or 0)
             completion_tokens = int(payload.get("generation_token_count", 0) or 0)
@@ -195,7 +183,7 @@ class BedrockLlamaWithLogprobsClient:
             # Logprobs: list[dict[token_id -> logprob]]
             raw_logprobs = payload.get("logprobs")
 
-            response_id = f"chatcmpl-{uuid.uuid4()}"
+            response_id = f"chatcmpl-{request_id}"
             created = int(time.time())
             model_name = str(payload.get("model") or self.model_arn)
 
@@ -217,7 +205,7 @@ class BedrockLlamaWithLogprobsClient:
             # In this envelope, logprobs (if any) live on the choice
             raw_logprobs = first.get("logprobs")
 
-            response_id = payload.get("id", f"chatcmpl-{uuid.uuid4()}")
+            response_id = payload.get("id", f"chatcmpl-{request_id}")
             created = int(payload.get("created", int(time.time())))
             model_name = str(payload.get("model") or self.model_arn)
 
@@ -227,7 +215,7 @@ class BedrockLlamaWithLogprobsClient:
             finish_reason = "stop"
             prompt_tokens = completion_tokens = total_tokens = 0
             raw_logprobs = None
-            response_id = f"chatcmpl-{uuid.uuid4()}"
+            response_id = f"chatcmpl-{request_id}"
             created = int(time.time())
             model_name = str(self.model_arn)
 
